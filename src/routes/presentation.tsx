@@ -86,7 +86,7 @@ function PresentationPage() {
         <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
             { name: "Neel Patil", id: "C351", photo: "/team/neel.jpg" },
-            { name: "Viransh Nishar", id: "C335", photo: null },
+            { name: "Viransh Nishar", id: "C335", photo: "/team/viransh.jpg" },
             { name: "Akshat Pandey", id: "C339", photo: "/team/akshat.jpg" },
             { name: "Atharv Patidar", id: "C348", photo: "/team/atharv.jpg" },
           ].map((person) => (
