@@ -6,9 +6,12 @@ import {
   Gauge,
   Play,
   Radio,
+  RefreshCw,
   Square,
   Upload,
   Video,
+  Volume2,
+  VolumeX,
   Zap,
 } from "lucide-react";
 import { formatBytes, powerModel, renderEventFrame, type EventStats } from "@/lib/event-camera";
@@ -43,6 +46,8 @@ export function EventCameraLab() {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const lastTickRef = useRef<number>(0);
   const fpsRef = useRef<number>(30);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const lastClickRef = useRef(0);
 
   const [source, setSource] = useState<Source>("webcam");
   const [running, setRunning] = useState(false);
@@ -51,6 +56,8 @@ export function EventCameraLab() {
   const [colorMode, setColorMode] = useState<ColorMode>("polarity");
   const [recording, setRecording] = useState<"none" | "event" | "raw">("none");
   const [status, setStatus] = useState("Camera idle");
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [soundOn, setSoundOn] = useState(false);
   const [stats, setStats] = useState<EventStats>({
     onEvents: 0,
     offEvents: 0,
@@ -60,8 +67,39 @@ export function EventCameraLab() {
   const [fps, setFps] = useState(0);
   const [shots, setShots] = useState<{ url: string; label: string }[]>([]);
 
-  const settings = useRef({ threshold, decay, colorMode });
-  settings.current = { threshold, decay, colorMode };
+  const settings = useRef({ threshold, decay, colorMode, soundOn });
+  settings.current = { threshold, decay, colorMode, soundOn };
+
+  const playClick = useCallback((intensity: number) => {
+    const ctx = audioCtxRef.current;
+    if (!ctx || ctx.state !== "running") return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 850 + intensity * 700;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(Math.min(0.18, 0.05 + intensity * 0.12), now + 0.002);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.035);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.04);
+  }, []);
+
+  const toggleSound = useCallback(async () => {
+    if (!soundOn) {
+      if (!audioCtxRef.current) {
+        const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        audioCtxRef.current = new Ctx();
+      }
+      if (audioCtxRef.current.state === "suspended") {
+        await audioCtxRef.current.resume();
+      }
+      setSoundOn(true);
+    } else {
+      setSoundOn(false);
+    }
+  }, [soundOn]);
 
   const stopEverything = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -114,6 +152,22 @@ export function EventCameraLab() {
           pixels: s.pixels,
           activityRatio: prevS.activityRatio * 0.8 + s.activityRatio * 0.2,
         };
+
+        // Audible "click" per burst of activity — rate scales with how much changed,
+        // like a Geiger counter, so quiet scenes stay silent.
+        if (settings.current.soundOn) {
+          const activity = s.activityRatio;
+          const minActivity = 0.003;
+          if (activity > minActivity) {
+            const clicksPerSec = Math.min(18, 2 + activity * 350);
+            const minGap = 1000 / clicksPerSec;
+            const now = performance.now();
+            if (now - lastClickRef.current > minGap) {
+              lastClickRef.current = now;
+              playClick(Math.min(1, activity * 15));
+            }
+          }
+        }
       }
     }
 
@@ -140,7 +194,7 @@ export function EventCameraLab() {
     try {
       setStatus("Requesting camera…");
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480 },
+        video: { width: 640, height: 480, facingMode: { ideal: facingMode } },
         audio: false,
       });
       streamRef.current = stream;
@@ -150,7 +204,7 @@ export function EventCameraLab() {
       await v.play();
       setSource("webcam");
       setRunning(true);
-      setStatus("Live · webcam");
+      setStatus(`Live · webcam (${facingMode === "user" ? "front" : "back"})`);
       prevLogRef.current = new Float32Array(W * H);
       outRef.current = null;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -158,7 +212,29 @@ export function EventCameraLab() {
     } catch {
       setStatus("Camera access blocked — allow it in your browser, or upload a video instead.");
     }
-  }, [loop]);
+  }, [loop, facingMode]);
+
+  const flipCamera = useCallback(async () => {
+    const next = facingMode === "user" ? "environment" : "user";
+    setFacingMode(next);
+    if (!(running && source === "webcam")) return;
+    try {
+      setStatus("Switching camera…");
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480, facingMode: { ideal: next } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      const v = videoRef.current!;
+      v.srcObject = stream;
+      v.muted = true;
+      await v.play();
+      setStatus(`Live · webcam (${next === "user" ? "front" : "back"})`);
+    } catch {
+      setStatus("Couldn't switch camera — this device may only have one.");
+    }
+  }, [facingMode, running, source]);
 
   const onUpload = useCallback(
     async (file: File) => {
@@ -266,6 +342,28 @@ export function EventCameraLab() {
         >
           {recording !== "none" ? <Square size={16} /> : <Video size={16} />}
           {recording !== "none" ? "Stop recording" : "Record event video"}
+        </button>
+
+        <button
+          onClick={flipCamera}
+          disabled={!(running && source === "webcam")}
+          title="Switch between front and back camera"
+          className="inline-flex items-center gap-2 rounded-md border border-border bg-secondary px-4 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-40"
+        >
+          <RefreshCw size={16} /> Flip camera
+        </button>
+
+        <button
+          onClick={toggleSound}
+          title="Play a click for each burst of event activity"
+          className={`inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition ${
+            soundOn
+              ? "border-primary bg-primary/15 text-primary"
+              : "border-border bg-secondary hover:bg-muted"
+          }`}
+        >
+          {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
+          {soundOn ? "Sound on" : "Sound off"}
         </button>
 
         <span className="ml-auto inline-flex items-center gap-2 font-mono text-xs text-muted-foreground">
