@@ -3,7 +3,8 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import slides from "@/assets/slides.json";
-import deck from "@/assets/presentation.pptx.asset.json";
+
+const deck = { url: "/Event-Based-Eye-Inspired-Presentation.pptx" };
 
 export const Route = createFileRoute("/presentation")({
   head: () => ({
@@ -80,6 +81,35 @@ function PresentationPage() {
         >
           <Download size={16} /> Download the slides (.pptx)
         </a>
+
+        <h2 className="mt-12 text-2xl font-semibold">Presented by</h2>
+        <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {[
+            { name: "Neel Patil", id: "C351", photo: "/team/neel.jpg" },
+            { name: "Viransh Nishar", id: "C335", photo: null },
+            { name: "Akshat Pandey", id: "C339", photo: "/team/akshat.jpg" },
+            { name: "Atharv Patidar", id: "C348", photo: "/team/atharv.jpg" },
+          ].map((person) => (
+            <div key={person.id} className="panel flex flex-col items-center gap-3 p-4 text-center">
+              {person.photo ? (
+                <img
+                  src={person.photo}
+                  alt={person.name}
+                  className="h-24 w-24 rounded-full object-cover ring-2 ring-primary/40"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="grid h-24 w-24 place-items-center rounded-full bg-secondary text-xs text-muted-foreground ring-2 ring-border">
+                  Photo coming soon
+                </div>
+              )}
+              <div>
+                <p className="text-sm font-semibold">{person.name}</p>
+                <p className="font-mono text-xs text-muted-foreground">{person.id}</p>
+              </div>
+            </div>
+          ))}
+        </div>
 
         <figure className="panel glow-ring mt-10 overflow-hidden p-2">
           <img
