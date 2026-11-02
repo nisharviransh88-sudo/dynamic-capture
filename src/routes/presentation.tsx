@@ -85,10 +85,10 @@ function PresentationPage() {
         <h2 className="mt-12 text-2xl font-semibold">Presented by</h2>
         <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
-            { name: "Neel Patil", id: "C351", photo: "/team/neel.jpg" },
-            { name: "Viransh Nishar", id: "C335", photo: "/team/viransh.jpg" },
-            { name: "Akshat Pandey", id: "C339", photo: "/team/akshat.jpg" },
-            { name: "Atharv Patidar", id: "C348", photo: "/team/atharv.jpg" },
+            { name: "Neel Patil", id: "C351", sap: "70022600223", photo: "/team/neel.jpg" },
+            { name: "Viransh Nishar", id: "C335", sap: "70022600424", photo: "/team/viransh.jpg" },
+            { name: "Akshat Pandey", id: "C339", sap: "70022600056", photo: "/team/akshat.jpg" },
+            { name: "Atharv Patidar", id: "C348", sap: "70022600054", photo: "/team/atharv.jpg" },
           ].map((person) => (
             <div key={person.id} className="panel flex flex-col items-center gap-3 p-4 text-center">
               {person.photo ? (
@@ -105,7 +105,8 @@ function PresentationPage() {
               )}
               <div>
                 <p className="text-sm font-semibold">{person.name}</p>
-                <p className="font-mono text-xs text-muted-foreground">{person.id}</p>
+                <p className="font-mono text-xs text-muted-foreground">Roll No: {person.id}</p>
+                <p className="font-mono text-xs text-muted-foreground">SAP ID: {person.sap}</p>
               </div>
             </div>
           ))}
